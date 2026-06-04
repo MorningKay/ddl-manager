@@ -41,6 +41,22 @@ void main() {
     expect(deadlines.single.isCompleted, isFalse);
   });
 
+  test('create can store a deadline with an unannounced date', () async {
+    await repository.createDeadline(
+      const DeadlineDraft(
+        title: 'Wait for contest schedule',
+        dueAt: null,
+        notes: '',
+        priority: DeadlinePriority.medium,
+      ),
+    );
+
+    final deadlines = await repository.listDeadlines();
+
+    expect(deadlines.single.title, 'Wait for contest schedule');
+    expect(deadlines.single.dueAt, isNull);
+  });
+
   test('update changes editable fields and updatedAt', () async {
     final id = await repository.createDeadline(
       DeadlineDraft(
@@ -70,6 +86,32 @@ void main() {
     expect(after.notes, 'Updated notes');
     expect(after.priority, DeadlinePriority.low);
     expect(after.updatedAt.isAfter(before.updatedAt), isTrue);
+  });
+
+  test('update can clear the due date', () async {
+    final id = await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Original title',
+        dueAt: DateTime(2026, 6, 10, 17),
+        notes: '',
+        priority: DeadlinePriority.medium,
+      ),
+    );
+
+    currentTime = DateTime(2026, 6, 1, 10);
+    await repository.updateDeadline(
+      id,
+      const DeadlineDraft(
+        title: 'Original title',
+        dueAt: null,
+        notes: '',
+        priority: DeadlinePriority.medium,
+      ),
+    );
+
+    final after = (await repository.listDeadlines()).single;
+
+    expect(after.dueAt, isNull);
   });
 
   test('toggle complete moves item after active deadlines', () async {
