@@ -17,8 +17,6 @@ class DeadlineStrings {
   String get dueTime => _isZh ? 'Deadline 时间' : 'Due time';
   String get dateKnown => _isZh ? '日期已公布' : 'Date announced';
   String get dateUnannounced => _isZh ? '日期未公布' : 'Date TBA';
-  String get dateUnannouncedHelp =>
-      _isZh ? '可先保存，公布日期后再补充具体时间。' : 'Save now and add the exact date later.';
   String get hour => _isZh ? '小时' : 'Hour';
   String get minute => _isZh ? '分钟' : 'Minute';
   String get priority => _isZh ? '优先级' : 'Priority';
@@ -47,7 +45,6 @@ class DeadlineStrings {
       : 'Deadlines past their due time will show up here.';
   String get exactDeadline => _isZh ? '截止时间' : 'Deadline';
   String get progress => _isZh ? '时间进度' : 'Time progress';
-  String get addedOrder => _isZh ? '按加入顺序排列' : 'Ordered by creation time';
 
   String loadError(Object error) {
     return _isZh ? '无法加载 Deadline: $error' : 'Could not load deadlines: $error';
@@ -67,11 +64,6 @@ class DeadlineStrings {
       DeadlinePriority.medium => '中',
       DeadlinePriority.high => '高',
     };
-  }
-
-  String priorityBadge(DeadlinePriority priority) {
-    final name = priorityName(priority);
-    return _isZh ? '$name优先级' : '$name priority';
   }
 
   String boardTitle(DeadlineBoardKind kind) {

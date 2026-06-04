@@ -105,7 +105,6 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
                 SwitchListTile.adaptive(
                   contentPadding: EdgeInsets.zero,
                   title: Text(strings.dateUnannounced),
-                  subtitle: Text(strings.dateUnannouncedHelp),
                   value: _isDateUnannounced,
                   onChanged: (value) {
                     setState(() {

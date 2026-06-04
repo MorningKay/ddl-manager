@@ -26,25 +26,45 @@ String formatRemainingTime(
   required DateTime now,
   required AppLanguage language,
 }) {
-  if (deadline.isCompleted) {
-    return language == AppLanguage.zh ? '已完成' : 'Completed';
-  }
-
   final dueAt = deadline.dueAt;
   if (dueAt == null) {
-    return language == AppLanguage.zh ? '日期未公布' : 'Date TBA';
+    return '—';
   }
 
   final difference = dueAt.difference(now);
   final isOverdue = difference.isNegative;
-  final duration = isOverdue ? now.difference(dueAt) : difference;
-  final amount = _formatDetailedDuration(duration, language);
-
-  if (language == AppLanguage.zh) {
-    return '${isOverdue ? '已截止' : '剩余'} $amount';
+  if (isOverdue) {
+    final marker = formatDueTimeMarker(dueAt, now: now, language: language);
+    return language == AppLanguage.zh ? '已截止 · $marker' : 'Closed · $marker';
   }
 
-  return isOverdue ? 'Closed $amount ago' : '$amount left';
+  final amount = _formatDetailedDuration(difference, language);
+
+  if (language == AppLanguage.zh) {
+    return '剩余 $amount';
+  }
+
+  return '$amount left';
+}
+
+String formatDueTimeMarker(
+  DateTime dueAt, {
+  required DateTime now,
+  required AppLanguage language,
+}) {
+  final shouldShowYear = dueAt.year != now.year;
+  final month = _twoDigits(dueAt.month);
+  final day = _twoDigits(dueAt.day);
+  final hour = _twoDigits(dueAt.hour);
+  final minute = _twoDigits(dueAt.minute);
+
+  if (language == AppLanguage.zh) {
+    final date = shouldShowYear ? '${dueAt.year}年$month月$day日' : '$month月$day日';
+    return '$date $hour:$minute';
+  }
+
+  final date = shouldShowYear ? '${dueAt.year}/$month/$day' : '$month/$day';
+  return '$date $hour:$minute';
 }
 
 String _formatDetailedDuration(Duration duration, AppLanguage language) {

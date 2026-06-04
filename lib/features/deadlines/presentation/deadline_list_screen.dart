@@ -127,6 +127,12 @@ class _DeadlineBoardPage extends StatelessWidget {
       return _EmptyBoardState(kind: column.kind, strings: strings);
     }
 
+    final now = DateTime.now();
+    final progressWindow = deadlineProgressWindow([
+      ...column.scheduled,
+      ...column.completed,
+    ], now);
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
@@ -134,6 +140,19 @@ class _DeadlineBoardPage extends StatelessWidget {
           for (final deadline in column.scheduled) ...[
             _DeadlineCard(
               deadline: deadline,
+              now: now,
+              progressWindow: progressWindow,
+              language: language,
+              strings: strings,
+            ),
+            const SizedBox(height: 10),
+          ],
+        if (column.completed.isNotEmpty)
+          for (final deadline in column.completed) ...[
+            _DeadlineCard(
+              deadline: deadline,
+              now: now,
+              progressWindow: progressWindow,
               language: language,
               strings: strings,
             ),
@@ -145,19 +164,8 @@ class _DeadlineBoardPage extends StatelessWidget {
           for (final deadline in column.dateUnannounced) ...[
             _DeadlineCard(
               deadline: deadline,
-              language: language,
-              strings: strings,
-            ),
-            const SizedBox(height: 10),
-          ],
-        ],
-        if (column.completed.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Divider(color: Theme.of(context).colorScheme.outlineVariant),
-          const SizedBox(height: 6),
-          for (final deadline in column.completed) ...[
-            _DeadlineCard(
-              deadline: deadline,
+              now: now,
+              progressWindow: progressWindow,
               language: language,
               strings: strings,
             ),
@@ -196,12 +204,6 @@ class _DateUnannouncedHeader extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
             ),
-            Text(
-              strings.addedOrder,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
           ],
         ),
       ),
@@ -212,21 +214,23 @@ class _DateUnannouncedHeader extends StatelessWidget {
 class _DeadlineCard extends ConsumerWidget {
   const _DeadlineCard({
     required this.deadline,
+    required this.now,
+    required this.progressWindow,
     required this.language,
     required this.strings,
   });
 
   final Deadline deadline;
+  final DateTime now;
+  final Duration progressWindow;
   final AppLanguage language;
   final DeadlineStrings strings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final now = DateTime.now();
     final colorScheme = Theme.of(context).colorScheme;
     final priorityTone = priorityColor(deadline.priority, colorScheme);
     final statusTone = remainingTimeColor(deadline, now, colorScheme);
-    final dueAt = deadline.dueAt;
     final cardTone = deadline.isCompleted ? colorScheme.outline : priorityTone;
 
     return Opacity(
@@ -330,34 +334,13 @@ class _DeadlineCard extends ConsumerWidget {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 6,
-                            children: [
-                              _StatusPill(
-                                icon: Icons.flag,
-                                label: strings.priorityBadge(deadline.priority),
-                                color: priorityTone,
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
                           _CountdownTrack(
                             deadline: deadline,
                             now: now,
+                            progressWindow: progressWindow,
                             language: language,
                             statusTone: statusTone,
                           ),
-                          if (dueAt == null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              strings.dateUnannouncedHelp,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -394,69 +377,29 @@ class _DeadlineCard extends ConsumerWidget {
   }
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final textStyle = Theme.of(
-      context,
-    ).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.28)),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 190),
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: textStyle,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _CountdownTrack extends StatelessWidget {
   const _CountdownTrack({
     required this.deadline,
     required this.now,
+    required this.progressWindow,
     required this.language,
     required this.statusTone,
   });
 
   final Deadline deadline;
   final DateTime now;
+  final Duration progressWindow;
   final AppLanguage language;
   final Color statusTone;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final progress = deadlineCountdownProgress(deadline, now);
+    final progress = deadlineCountdownProgress(
+      deadline,
+      now,
+      visibleWindow: progressWindow,
+    );
     final countdown = formatRemainingTime(
       deadline,
       now: now,
@@ -481,6 +424,10 @@ class _CountdownTrack extends StatelessWidget {
                 ),
               ),
             ),
+            if (deadline.isCompleted) ...[
+              const SizedBox(width: 8),
+              _CompletedBadge(label: DeadlineStrings(language).completed),
+            ],
           ],
         ),
         const SizedBox(height: 6),
@@ -494,6 +441,38 @@ class _CountdownTrack extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CompletedBadge extends StatelessWidget {
+  const _CompletedBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = colorScheme.outline;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
 }

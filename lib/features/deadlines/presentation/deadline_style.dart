@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../domain/deadline.dart';
 
+const _minimumProgressWindow = Duration(days: 7);
+const _maximumProgressWindow = Duration(days: 365);
+const _targetRemainingNumerator = 7;
+const _targetRemainingDenominator = 10;
+const _outlierResistantItemCount = 4;
+
 Color priorityColor(DeadlinePriority priority, ColorScheme colorScheme) {
   return switch (priority) {
     DeadlinePriority.low => const Color(0xFF047857),
@@ -37,10 +43,6 @@ Color remainingTimeColor(
 }
 
 IconData remainingTimeIcon(Deadline deadline, DateTime now) {
-  if (deadline.isCompleted) {
-    return Icons.task_alt;
-  }
-
   final dueAt = deadline.dueAt;
   if (dueAt == null) {
     return Icons.event_busy;
@@ -58,7 +60,40 @@ IconData remainingTimeIcon(Deadline deadline, DateTime now) {
   return Icons.schedule;
 }
 
-double deadlineCountdownProgress(Deadline deadline, DateTime now) {
+Duration deadlineProgressWindow(Iterable<Deadline> deadlines, DateTime now) {
+  final remainingSeconds = <int>[];
+  for (final deadline in deadlines) {
+    final dueAt = deadline.dueAt;
+    if (dueAt == null || !dueAt.isAfter(now)) {
+      continue;
+    }
+
+    remainingSeconds.add(dueAt.difference(now).inSeconds);
+  }
+
+  if (remainingSeconds.isEmpty) {
+    return const Duration(days: 90);
+  }
+
+  remainingSeconds.sort();
+  final typicalMaxSeconds = _typicalMaxRemainingSeconds(remainingSeconds);
+  final targetWindowSeconds =
+      (typicalMaxSeconds * _targetRemainingDenominator +
+          _targetRemainingNumerator -
+          1) ~/
+      _targetRemainingNumerator;
+  final boundedWindowSeconds = targetWindowSeconds
+      .clamp(_minimumProgressWindow.inSeconds, _maximumProgressWindow.inSeconds)
+      .toInt();
+
+  return Duration(seconds: boundedWindowSeconds);
+}
+
+double deadlineCountdownProgress(
+  Deadline deadline,
+  DateTime now, {
+  Duration? visibleWindow,
+}) {
   final dueAt = deadline.dueAt;
   if (dueAt == null) {
     return 0;
@@ -68,8 +103,21 @@ double deadlineCountdownProgress(Deadline deadline, DateTime now) {
     return 1;
   }
 
-  const visibleWindow = Duration(days: 90);
-  final remainingMinutes = dueAt.difference(now).inMinutes;
-  final windowMinutes = visibleWindow.inMinutes;
-  return (1 - remainingMinutes / windowMinutes).clamp(0, 1).toDouble();
+  final window = visibleWindow ?? deadlineProgressWindow([deadline], now);
+  final windowSeconds = window.inSeconds;
+  if (windowSeconds <= 0) {
+    return 0;
+  }
+
+  final remainingSeconds = dueAt.difference(now).inSeconds;
+  return (1 - remainingSeconds / windowSeconds).clamp(0, 1).toDouble();
+}
+
+int _typicalMaxRemainingSeconds(List<int> sortedRemainingSeconds) {
+  if (sortedRemainingSeconds.length < _outlierResistantItemCount) {
+    return sortedRemainingSeconds.last;
+  }
+
+  final percentileIndex = ((sortedRemainingSeconds.length - 1) * 0.9).floor();
+  return sortedRemainingSeconds[percentileIndex];
 }
