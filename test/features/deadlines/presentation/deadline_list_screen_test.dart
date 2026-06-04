@@ -71,10 +71,12 @@ void main() {
 
     expect(find.text('Contest result'), findsOneWidget);
     expect(find.text('日期未公布'), findsAtLeastNWidgets(1));
-    expect(find.text('按加入顺序排列'), findsAtLeastNWidgets(1));
+    expect(find.text('—'), findsOneWidget);
+    expect(find.text('按加入顺序排列'), findsNothing);
+    expect(find.text('可先保存，公布日期后再补充具体时间。'), findsNothing);
   });
 
-  testWidgets('shows priority color labels and detailed remaining time', (
+  testWidgets('shows detailed remaining time without priority text badges', (
     tester,
   ) async {
     final repository = InMemoryDeadlineRepository();
@@ -92,7 +94,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Submit scholarship'), findsOneWidget);
-    expect(find.text('高优先级'), findsOneWidget);
+    expect(find.text('高优先级'), findsNothing);
     expect(find.textContaining('剩余'), findsOneWidget);
     expect(find.text('时间进度'), findsNothing);
     expect(find.textContaining('截止时间:'), findsNothing);
@@ -101,10 +103,12 @@ void main() {
   testWidgets('shows overdue deadlines on the closed tab', (tester) async {
     final repository = InMemoryDeadlineRepository();
     addTearDown(repository.close);
+    final now = DateTime.now();
+    final dueAt = now.subtract(const Duration(hours: 3));
     await repository.createDeadline(
       DeadlineDraft(
         title: 'Expired form',
-        dueAt: DateTime.now().subtract(const Duration(hours: 3)),
+        dueAt: dueAt,
         notes: '',
         priority: DeadlinePriority.high,
       ),
@@ -116,7 +120,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Expired form'), findsOneWidget);
-    expect(find.textContaining('已截止'), findsAtLeastNWidgets(1));
+    expect(
+      find.text('已截止 · ${_formatZhDateMarker(dueAt, now)}'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('opens the editor and updates a deadline', (tester) async {
@@ -162,7 +169,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('已完成'), findsAtLeastNWidgets(1));
+    expect(find.textContaining('剩余'), findsOneWidget);
     expect(find.text('Read chapter'), findsOneWidget);
+  });
+
+  testWidgets('shows completed dated items before unannounced dates', (
+    tester,
+  ) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+    final completedId = await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Completed dated',
+        dueAt: DateTime.now().add(const Duration(days: 1)),
+        notes: '',
+        priority: DeadlinePriority.medium,
+      ),
+    );
+    await repository.toggleCompleted(completedId, true);
+    await repository.createDeadline(
+      const DeadlineDraft(
+        title: 'TBA item',
+        dueAt: null,
+        notes: '',
+        priority: DeadlinePriority.low,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pump();
+
+    final completedTop = tester.getTopLeft(find.text('Completed dated')).dy;
+    final tbaTop = tester.getTopLeft(find.text('TBA item')).dy;
+
+    expect(completedTop, lessThan(tbaTop));
   });
 }
 
@@ -178,4 +218,16 @@ Future<void> _tapSave(WidgetTester tester) async {
   await tester.ensureVisible(saveButton);
   await tester.tap(saveButton);
   await tester.pumpAndSettle();
+}
+
+String _formatZhDateMarker(DateTime dueAt, DateTime now) {
+  final date = dueAt.year == now.year
+      ? '${_twoDigits(dueAt.month)}月${_twoDigits(dueAt.day)}日'
+      : '${dueAt.year}年${_twoDigits(dueAt.month)}月${_twoDigits(dueAt.day)}日';
+  return '$date '
+      '${_twoDigits(dueAt.hour)}:${_twoDigits(dueAt.minute)}';
+}
+
+String _twoDigits(int value) {
+  return value.toString().padLeft(2, '0');
 }
