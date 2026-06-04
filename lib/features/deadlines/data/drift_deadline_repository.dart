@@ -30,7 +30,7 @@ class DriftDeadlineRepository implements DeadlineRepository {
         .insert(
           DeadlineEntriesCompanion.insert(
             title: _cleanTitle(draft.title),
-            dueAt: draft.dueAt,
+            dueAt: Value(draft.dueAt),
             notes: Value(draft.notes.trim()),
             priority: Value(draft.priority.name),
             createdAt: now,
@@ -93,13 +93,12 @@ class DriftDeadlineRepository implements DeadlineRepository {
   SimpleSelectStatement<$DeadlineEntriesTable, DeadlineRow> _orderedSelect() {
     return _database.select(_database.deadlineEntries)..orderBy([
       (entry) => OrderingTerm.asc(entry.isCompleted),
-      (entry) => OrderingTerm.asc(entry.dueAt),
       (entry) => OrderingTerm.asc(entry.createdAt),
     ]);
   }
 
   List<Deadline> _mapRows(List<DeadlineRow> rows) {
-    return rows.map(_mapRow).toList(growable: false);
+    return sortDeadlines(rows.map(_mapRow));
   }
 
   Deadline _mapRow(DeadlineRow row) {

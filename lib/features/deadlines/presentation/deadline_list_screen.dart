@@ -1,30 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/app_language.dart';
 import '../application/deadline_providers.dart';
 import '../domain/deadline.dart';
 import 'deadline_form_sheet.dart';
 import 'deadline_formatters.dart';
 import 'deadline_sections.dart';
+import 'deadline_strings.dart';
+import 'deadline_style.dart';
 
 class DeadlineListScreen extends ConsumerWidget {
   const DeadlineListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final language = ref.watch(appLanguageProvider);
+    final strings = DeadlineStrings(language);
     final deadlines = ref.watch(deadlinesProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('DDLManager')),
-      body: deadlines.when(
-        data: (items) => _DeadlineList(deadlines: items),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => _ErrorState(error: error),
-      ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Add deadline',
-        onPressed: () => _showForm(context),
-        child: const Icon(Icons.add),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('DDLManager'),
+          actions: [
+            IconButton(
+              tooltip: strings.settings,
+              onPressed: () => _showSettings(context),
+              icon: const Icon(Icons.settings),
+            ),
+          ],
+          bottom: TabBar(
+            tabs: [
+              Tab(text: strings.inProgress),
+              Tab(text: strings.closed),
+            ],
+          ),
+        ),
+        body: deadlines.when(
+          data: (items) => _DeadlineTabs(
+            deadlines: items,
+            language: language,
+            strings: strings,
+          ),
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (error, _) => _ErrorState(error: error, strings: strings),
+        ),
+        floatingActionButton: FloatingActionButton(
+          tooltip: strings.addDeadline,
+          onPressed: () => _showForm(context),
+          child: const Icon(Icons.add),
+        ),
       ),
     );
   }
@@ -37,109 +64,309 @@ class DeadlineListScreen extends ConsumerWidget {
       builder: (_) => DeadlineFormSheet(deadline: deadline),
     );
   }
+
+  void _showSettings(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => const _LanguageSettingsSheet(),
+    );
+  }
 }
 
-class _DeadlineList extends StatelessWidget {
-  const _DeadlineList({required this.deadlines});
+class _DeadlineTabs extends StatelessWidget {
+  const _DeadlineTabs({
+    required this.deadlines,
+    required this.language,
+    required this.strings,
+  });
 
   final List<Deadline> deadlines;
+  final AppLanguage language;
+  final DeadlineStrings strings;
 
   @override
   Widget build(BuildContext context) {
     if (deadlines.isEmpty) {
-      return const _EmptyState();
+      return _EmptyState(strings: strings);
     }
 
-    final sections = buildDeadlineSections(deadlines);
+    final board = buildDeadlineBoard(deadlines);
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-      itemCount: sections.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 8),
-      itemBuilder: (context, index) {
-        final section = sections[index];
-        return _DeadlineSectionView(section: section);
-      },
+    return TabBarView(
+      children: [
+        _DeadlineBoardPage(
+          column: board.inProgress,
+          language: language,
+          strings: strings,
+        ),
+        _DeadlineBoardPage(
+          column: board.closed,
+          language: language,
+          strings: strings,
+        ),
+      ],
     );
   }
 }
 
-class _DeadlineSectionView extends StatelessWidget {
-  const _DeadlineSectionView({required this.section});
+class _DeadlineBoardPage extends StatelessWidget {
+  const _DeadlineBoardPage({
+    required this.column,
+    required this.language,
+    required this.strings,
+  });
 
-  final DeadlineSection section;
+  final DeadlineBoardColumn column;
+  final AppLanguage language;
+  final DeadlineStrings strings;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      container: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Text(
-              section.title,
-              style: Theme.of(context).textTheme.titleMedium,
+    if (column.isEmpty) {
+      return _EmptyBoardState(kind: column.kind, strings: strings);
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
+      children: [
+        if (column.scheduled.isNotEmpty)
+          for (final deadline in column.scheduled) ...[
+            _DeadlineCard(
+              deadline: deadline,
+              language: language,
+              strings: strings,
             ),
-          ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
-              borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 10),
+          ],
+        if (column.dateUnannounced.isNotEmpty) ...[
+          _DateUnannouncedHeader(strings: strings),
+          const SizedBox(height: 8),
+          for (final deadline in column.dateUnannounced) ...[
+            _DeadlineCard(
+              deadline: deadline,
+              language: language,
+              strings: strings,
             ),
-            child: Column(
-              children: [
-                for (final (index, deadline) in section.deadlines.indexed) ...[
-                  _DeadlineTile(deadline: deadline),
-                  if (index != section.deadlines.length - 1)
-                    const Divider(height: 1),
-                ],
-              ],
-            ),
-          ),
+            const SizedBox(height: 10),
+          ],
         ],
+        if (column.completed.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Divider(color: Theme.of(context).colorScheme.outlineVariant),
+          const SizedBox(height: 6),
+          for (final deadline in column.completed) ...[
+            _DeadlineCard(
+              deadline: deadline,
+              language: language,
+              strings: strings,
+            ),
+            const SizedBox(height: 10),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
+class _DateUnannouncedHeader extends StatelessWidget {
+  const _DateUnannouncedHeader({required this.strings});
+
+  final DeadlineStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.tertiary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: colorScheme.tertiary.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.event_busy, size: 18, color: colorScheme.tertiary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                strings.dateUnannounced,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
+            ),
+            Text(
+              strings.addedOrder,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _DeadlineTile extends ConsumerWidget {
-  const _DeadlineTile({required this.deadline});
+class _DeadlineCard extends ConsumerWidget {
+  const _DeadlineCard({
+    required this.deadline,
+    required this.language,
+    required this.strings,
+  });
 
   final Deadline deadline;
+  final AppLanguage language;
+  final DeadlineStrings strings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ListTile(
-      leading: Checkbox(
-        value: deadline.isCompleted,
-        onChanged: (value) {
-          ref
-              .read(deadlineRepositoryProvider)
-              .toggleCompleted(deadline.id, value ?? false);
-        },
-      ),
-      title: Text(
-        deadline.title,
-        style: deadline.isCompleted
-            ? const TextStyle(decoration: TextDecoration.lineThrough)
-            : null,
-      ),
-      subtitle: Text(
-        '${formatDueAt(deadline.dueAt)} · ${formatPriority(deadline.priority)}'
-        '${deadline.notes.isEmpty ? '' : ' · ${deadline.notes}'}',
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-      ),
-      onTap: () => _showForm(context, deadline),
-      trailing: PopupMenuButton<_DeadlineAction>(
-        tooltip: 'Deadline actions',
-        onSelected: (action) => _handleAction(context, ref, action),
-        itemBuilder: (context) => const [
-          PopupMenuItem(value: _DeadlineAction.edit, child: Text('Edit')),
-          PopupMenuItem(value: _DeadlineAction.delete, child: Text('Delete')),
-        ],
+    final now = DateTime.now();
+    final colorScheme = Theme.of(context).colorScheme;
+    final priorityTone = priorityColor(deadline.priority, colorScheme);
+    final statusTone = remainingTimeColor(deadline, now, colorScheme);
+    final dueAt = deadline.dueAt;
+    final cardTone = deadline.isCompleted ? colorScheme.outline : priorityTone;
+
+    return Opacity(
+      opacity: deadline.isCompleted ? 0.72 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _showForm(context, deadline),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: cardTone.withValues(alpha: 0.065),
+              border: Border.all(color: cardTone.withValues(alpha: 0.18)),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: priorityTone.withValues(alpha: 0.78),
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(8),
+                      ),
+                    ),
+                    child: const SizedBox(width: 5),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 10, 8, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Checkbox(
+                                value: deadline.isCompleted,
+                                visualDensity: VisualDensity.compact,
+                                onChanged: (value) {
+                                  ref
+                                      .read(deadlineRepositoryProvider)
+                                      .toggleCompleted(
+                                        deadline.id,
+                                        value ?? false,
+                                      );
+                                },
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(top: 7),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        deadline.title,
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .titleMedium
+                                            ?.copyWith(
+                                              decoration: deadline.isCompleted
+                                                  ? TextDecoration.lineThrough
+                                                  : null,
+                                            ),
+                                      ),
+                                      if (deadline.notes.isNotEmpty) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          deadline.notes,
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: Theme.of(
+                                            context,
+                                          ).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              PopupMenuButton<_DeadlineAction>(
+                                tooltip: strings.deadlineActions,
+                                onSelected: (action) =>
+                                    _handleAction(context, ref, action),
+                                itemBuilder: (context) => [
+                                  PopupMenuItem(
+                                    value: _DeadlineAction.edit,
+                                    child: Text(strings.edit),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _DeadlineAction.delete,
+                                    child: Text(strings.delete),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              _StatusPill(
+                                icon: Icons.flag,
+                                label: strings.priorityBadge(deadline.priority),
+                                color: priorityTone,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          _CountdownTrack(
+                            deadline: deadline,
+                            now: now,
+                            language: language,
+                            statusTone: statusTone,
+                          ),
+                          if (dueAt == null) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              strings.dateUnannouncedHelp,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -167,8 +394,165 @@ class _DeadlineTile extends ConsumerWidget {
   }
 }
 
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({
+    required this.icon,
+    required this.label,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final textStyle = Theme.of(
+      context,
+    ).textTheme.labelSmall?.copyWith(color: color, fontWeight: FontWeight.w700);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 190),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textStyle,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CountdownTrack extends StatelessWidget {
+  const _CountdownTrack({
+    required this.deadline,
+    required this.now,
+    required this.language,
+    required this.statusTone,
+  });
+
+  final Deadline deadline;
+  final DateTime now;
+  final AppLanguage language;
+  final Color statusTone;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final progress = deadlineCountdownProgress(deadline, now);
+    final countdown = formatRemainingTime(
+      deadline,
+      now: now,
+      language: language,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(remainingTimeIcon(deadline, now), size: 15, color: statusTone),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                countdown,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: statusTone,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 8,
+            value: progress,
+            color: statusTone,
+            backgroundColor: colorScheme.surfaceContainerHighest,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LanguageSettingsSheet extends ConsumerWidget {
+  const _LanguageSettingsSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final language = ref.watch(appLanguageProvider);
+    final strings = DeadlineStrings(language);
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              strings.settings,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              strings.languageLabel,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<AppLanguage>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: AppLanguage.zh,
+                  label: Text(strings.chinese),
+                ),
+                ButtonSegment(
+                  value: AppLanguage.en,
+                  label: Text(strings.english),
+                ),
+              ],
+              selected: {language},
+              onSelectionChanged: (selected) {
+                ref
+                    .read(appLanguageProvider.notifier)
+                    .setLanguage(selected.single);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.strings});
+
+  final DeadlineStrings strings;
 
   @override
   Widget build(BuildContext context) {
@@ -185,12 +569,57 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'No deadlines yet',
+              strings.noDeadlinesTitle,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
             Text(
-              'Add your first deadline to start tracking work.',
+              strings.noDeadlinesBody,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyBoardState extends StatelessWidget {
+  const _EmptyBoardState({required this.kind, required this.strings});
+
+  final DeadlineBoardKind kind;
+  final DeadlineStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = switch (kind) {
+      DeadlineBoardKind.inProgress => strings.noInProgressTitle,
+      DeadlineBoardKind.closed => strings.noClosedTitle,
+    };
+    final body = switch (kind) {
+      DeadlineBoardKind.inProgress => strings.noInProgressBody,
+      DeadlineBoardKind.closed => strings.noClosedBody,
+    };
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              kind == DeadlineBoardKind.inProgress
+                  ? Icons.hourglass_top
+                  : Icons.event_busy,
+              size: 44,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            const SizedBox(height: 14),
+            Text(title, style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 8),
+            Text(
+              body,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
@@ -202,19 +631,17 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.error});
+  const _ErrorState({required this.error, required this.strings});
 
   final Object error;
+  final DeadlineStrings strings;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          'Could not load deadlines: $error',
-          textAlign: TextAlign.center,
-        ),
+        child: Text(strings.loadError(error), textAlign: TextAlign.center),
       ),
     );
   }

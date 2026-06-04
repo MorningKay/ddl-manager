@@ -17,7 +17,7 @@ class DeadlineDraft {
   });
 
   final String title;
-  final DateTime dueAt;
+  final DateTime? dueAt;
   final String notes;
   final DeadlinePriority priority;
 }
@@ -36,7 +36,7 @@ class Deadline {
 
   final int id;
   final String title;
-  final DateTime dueAt;
+  final DateTime? dueAt;
   final String notes;
   final DeadlinePriority priority;
   final bool isCompleted;
@@ -47,6 +47,7 @@ class Deadline {
     int? id,
     String? title,
     DateTime? dueAt,
+    bool clearDueAt = false,
     String? notes,
     DeadlinePriority? priority,
     bool? isCompleted,
@@ -56,7 +57,7 @@ class Deadline {
     return Deadline(
       id: id ?? this.id,
       title: title ?? this.title,
-      dueAt: dueAt ?? this.dueAt,
+      dueAt: clearDueAt ? null : dueAt ?? this.dueAt,
       notes: notes ?? this.notes,
       priority: priority ?? this.priority,
       isCompleted: isCompleted ?? this.isCompleted,
@@ -73,7 +74,17 @@ List<Deadline> sortDeadlines(Iterable<Deadline> deadlines) {
       return a.isCompleted ? 1 : -1;
     }
 
-    final dueComparison = a.dueAt.compareTo(b.dueAt);
+    final aDueAt = a.dueAt;
+    final bDueAt = b.dueAt;
+    if (aDueAt == null || bDueAt == null) {
+      if (aDueAt != bDueAt) {
+        return aDueAt == null ? 1 : -1;
+      }
+
+      return a.createdAt.compareTo(b.createdAt);
+    }
+
+    final dueComparison = aDueAt.compareTo(bDueAt);
     if (dueComparison != 0) {
       return dueComparison;
     }

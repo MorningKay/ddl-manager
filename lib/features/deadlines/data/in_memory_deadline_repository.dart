@@ -49,6 +49,7 @@ class InMemoryDeadlineRepository implements DeadlineRepository {
     _deadlines[index] = _deadlines[index].copyWith(
       title: _cleanTitle(draft.title),
       dueAt: draft.dueAt,
+      clearDueAt: draft.dueAt == null,
       notes: draft.notes.trim(),
       priority: draft.priority,
       updatedAt: _now(),

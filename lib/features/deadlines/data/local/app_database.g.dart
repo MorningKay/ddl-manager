@@ -36,9 +36,9 @@ class $DeadlineEntriesTable extends DeadlineEntries
   late final GeneratedColumn<DateTime> dueAt = GeneratedColumn<DateTime>(
     'due_at',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.dateTime,
-    requiredDuringInsert: true,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _notesMeta = const VerificationMeta('notes');
   @override
@@ -138,8 +138,6 @@ class $DeadlineEntriesTable extends DeadlineEntries
         _dueAtMeta,
         dueAt.isAcceptableOrUnknown(data['due_at']!, _dueAtMeta),
       );
-    } else if (isInserting) {
-      context.missing(_dueAtMeta);
     }
     if (data.containsKey('notes')) {
       context.handle(
@@ -198,7 +196,7 @@ class $DeadlineEntriesTable extends DeadlineEntries
       dueAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}due_at'],
-      )!,
+      ),
       notes: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}notes'],
@@ -231,7 +229,7 @@ class $DeadlineEntriesTable extends DeadlineEntries
 class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
   final int id;
   final String title;
-  final DateTime dueAt;
+  final DateTime? dueAt;
   final String notes;
   final String priority;
   final bool isCompleted;
@@ -240,7 +238,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
   const DeadlineRow({
     required this.id,
     required this.title,
-    required this.dueAt,
+    this.dueAt,
     required this.notes,
     required this.priority,
     required this.isCompleted,
@@ -252,7 +250,9 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['title'] = Variable<String>(title);
-    map['due_at'] = Variable<DateTime>(dueAt);
+    if (!nullToAbsent || dueAt != null) {
+      map['due_at'] = Variable<DateTime>(dueAt);
+    }
     map['notes'] = Variable<String>(notes);
     map['priority'] = Variable<String>(priority);
     map['is_completed'] = Variable<bool>(isCompleted);
@@ -265,7 +265,9 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     return DeadlineEntriesCompanion(
       id: Value(id),
       title: Value(title),
-      dueAt: Value(dueAt),
+      dueAt: dueAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(dueAt),
       notes: Value(notes),
       priority: Value(priority),
       isCompleted: Value(isCompleted),
@@ -282,7 +284,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     return DeadlineRow(
       id: serializer.fromJson<int>(json['id']),
       title: serializer.fromJson<String>(json['title']),
-      dueAt: serializer.fromJson<DateTime>(json['dueAt']),
+      dueAt: serializer.fromJson<DateTime?>(json['dueAt']),
       notes: serializer.fromJson<String>(json['notes']),
       priority: serializer.fromJson<String>(json['priority']),
       isCompleted: serializer.fromJson<bool>(json['isCompleted']),
@@ -296,7 +298,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'title': serializer.toJson<String>(title),
-      'dueAt': serializer.toJson<DateTime>(dueAt),
+      'dueAt': serializer.toJson<DateTime?>(dueAt),
       'notes': serializer.toJson<String>(notes),
       'priority': serializer.toJson<String>(priority),
       'isCompleted': serializer.toJson<bool>(isCompleted),
@@ -308,7 +310,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
   DeadlineRow copyWith({
     int? id,
     String? title,
-    DateTime? dueAt,
+    Value<DateTime?> dueAt = const Value.absent(),
     String? notes,
     String? priority,
     bool? isCompleted,
@@ -317,7 +319,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
   }) => DeadlineRow(
     id: id ?? this.id,
     title: title ?? this.title,
-    dueAt: dueAt ?? this.dueAt,
+    dueAt: dueAt.present ? dueAt.value : this.dueAt,
     notes: notes ?? this.notes,
     priority: priority ?? this.priority,
     isCompleted: isCompleted ?? this.isCompleted,
@@ -382,7 +384,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
 class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
   final Value<int> id;
   final Value<String> title;
-  final Value<DateTime> dueAt;
+  final Value<DateTime?> dueAt;
   final Value<String> notes;
   final Value<String> priority;
   final Value<bool> isCompleted;
@@ -401,14 +403,13 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
   DeadlineEntriesCompanion.insert({
     this.id = const Value.absent(),
     required String title,
-    required DateTime dueAt,
+    this.dueAt = const Value.absent(),
     this.notes = const Value.absent(),
     this.priority = const Value.absent(),
     this.isCompleted = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
   }) : title = Value(title),
-       dueAt = Value(dueAt),
        createdAt = Value(createdAt),
        updatedAt = Value(updatedAt);
   static Insertable<DeadlineRow> custom({
@@ -436,7 +437,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
   DeadlineEntriesCompanion copyWith({
     Value<int>? id,
     Value<String>? title,
-    Value<DateTime>? dueAt,
+    Value<DateTime?>? dueAt,
     Value<String>? notes,
     Value<String>? priority,
     Value<bool>? isCompleted,
@@ -518,7 +519,7 @@ typedef $$DeadlineEntriesTableCreateCompanionBuilder =
     DeadlineEntriesCompanion Function({
       Value<int> id,
       required String title,
-      required DateTime dueAt,
+      Value<DateTime?> dueAt,
       Value<String> notes,
       Value<String> priority,
       Value<bool> isCompleted,
@@ -529,7 +530,7 @@ typedef $$DeadlineEntriesTableUpdateCompanionBuilder =
     DeadlineEntriesCompanion Function({
       Value<int> id,
       Value<String> title,
-      Value<DateTime> dueAt,
+      Value<DateTime?> dueAt,
       Value<String> notes,
       Value<String> priority,
       Value<bool> isCompleted,
@@ -708,7 +709,7 @@ class $$DeadlineEntriesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> title = const Value.absent(),
-                Value<DateTime> dueAt = const Value.absent(),
+                Value<DateTime?> dueAt = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<String> priority = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
@@ -728,7 +729,7 @@ class $$DeadlineEntriesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String title,
-                required DateTime dueAt,
+                Value<DateTime?> dueAt = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<String> priority = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),

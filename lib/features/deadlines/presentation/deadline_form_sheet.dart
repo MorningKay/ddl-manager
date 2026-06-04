@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/app_language.dart';
 import '../application/deadline_providers.dart';
 import '../domain/deadline.dart';
 import 'deadline_formatters.dart';
+import 'deadline_strings.dart';
+import 'deadline_style.dart';
 
 class DeadlineFormSheet extends ConsumerStatefulWidget {
   const DeadlineFormSheet({super.key, this.deadline});
@@ -20,6 +23,7 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
   late final TextEditingController _notesController;
   late DateTime _dueAt;
   late DeadlinePriority _priority;
+  late bool _isDateUnannounced;
   bool _isSaving = false;
 
   bool get _isEditing => widget.deadline != null;
@@ -32,6 +36,7 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
     _notesController = TextEditingController(text: deadline?.notes ?? '');
     _dueAt = deadline?.dueAt ?? _defaultDueAt();
     _priority = deadline?.priority ?? DeadlinePriority.medium;
+    _isDateUnannounced = deadline != null && deadline.dueAt == null;
   }
 
   @override
@@ -43,6 +48,10 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final language = ref.watch(appLanguageProvider);
+    final strings = DeadlineStrings(language);
+    final colorScheme = Theme.of(context).colorScheme;
+
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -58,21 +67,21 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _isEditing ? 'Edit deadline' : 'Add deadline',
+                  _isEditing ? strings.editDeadline : strings.addDeadline,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
                   controller: _titleController,
                   autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Title',
+                  decoration: InputDecoration(
+                    labelText: strings.title,
                     border: OutlineInputBorder(),
                   ),
                   textInputAction: TextInputAction.next,
                   validator: (value) {
                     if (value == null || value.trim().isEmpty) {
-                      return 'Title is required';
+                      return strings.titleRequired;
                     }
                     return null;
                   },
@@ -80,44 +89,75 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notes',
+                  decoration: InputDecoration(
+                    labelText: strings.notes,
                     border: OutlineInputBorder(),
                   ),
                   minLines: 2,
                   maxLines: 4,
                 ),
                 const SizedBox(height: 16),
-                Text('Due time', style: Theme.of(context).textTheme.labelLarge),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickDate,
-                        icon: const Icon(Icons.calendar_month),
-                        label: Text(formatDueAt(_dueAt).split(' ').first),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickTime,
-                        icon: const Icon(Icons.schedule),
-                        label: Text(formatDueAt(_dueAt).split(' ').last),
-                      ),
-                    ),
-                  ],
+                Text(
+                  strings.dueTime,
+                  style: Theme.of(context).textTheme.labelLarge,
                 ),
+                const SizedBox(height: 8),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(strings.dateUnannounced),
+                  subtitle: Text(strings.dateUnannouncedHelp),
+                  value: _isDateUnannounced,
+                  onChanged: (value) {
+                    setState(() {
+                      _isDateUnannounced = value;
+                    });
+                  },
+                ),
+                if (!_isDateUnannounced) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickDate,
+                    icon: const Icon(Icons.calendar_month),
+                    label: Text(formatDueDate(_dueAt, language)),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _HourField(
+                          value: _dueAt.hour,
+                          label: strings.hour,
+                          onChanged: _setHour,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _MinuteField(
+                          value: _dueAt.minute,
+                          label: strings.minute,
+                          onChanged: _setMinute,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
-                Text('Priority', style: Theme.of(context).textTheme.labelLarge),
+                Text(
+                  strings.priority,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
                 const SizedBox(height: 8),
                 SegmentedButton<DeadlinePriority>(
                   segments: DeadlinePriority.values
                       .map(
                         (priority) => ButtonSegment(
                           value: priority,
-                          label: Text(priority.label),
+                          icon: Icon(
+                            Icons.flag,
+                            color: priorityColor(priority, colorScheme),
+                          ),
+                          label: Text(strings.priorityName(priority)),
                         ),
                       )
                       .toList(growable: false),
@@ -132,14 +172,14 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _isSaving ? null : _save,
+                    onPressed: _isSaving ? null : () => _save(strings),
                     icon: _isSaving
                         ? const SizedBox.square(
                             dimension: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.save),
-                    label: const Text('Save'),
+                    label: Text(strings.save),
                   ),
                 ),
               ],
@@ -173,28 +213,31 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
     });
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_dueAt),
-    );
-
-    if (picked == null || !mounted) {
-      return;
-    }
-
+  void _setHour(int hour) {
     setState(() {
       _dueAt = DateTime(
         _dueAt.year,
         _dueAt.month,
         _dueAt.day,
-        picked.hour,
-        picked.minute,
+        hour,
+        _dueAt.minute,
       );
     });
   }
 
-  Future<void> _save() async {
+  void _setMinute(int minute) {
+    setState(() {
+      _dueAt = DateTime(
+        _dueAt.year,
+        _dueAt.month,
+        _dueAt.day,
+        _dueAt.hour,
+        minute,
+      );
+    });
+  }
+
+  Future<void> _save(DeadlineStrings strings) async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -205,7 +248,7 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
 
     final draft = DeadlineDraft(
       title: _titleController.text,
-      dueAt: _dueAt,
+      dueAt: _isDateUnannounced ? null : _dueAt,
       notes: _notesController.text,
       priority: _priority,
     );
@@ -224,9 +267,9 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save deadline: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(strings.saveError(error))));
         setState(() {
           _isSaving = false;
         });
@@ -238,4 +281,70 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day + 1, 17);
   }
+}
+
+class _HourField extends StatelessWidget {
+  const _HourField({
+    required this.value,
+    required this.label,
+    required this.onChanged,
+  });
+
+  final int value;
+  final String label;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<int>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(),
+      ),
+      items: List.generate(24, (hour) {
+        return DropdownMenuItem(value: hour, child: Text(_twoDigits(hour)));
+      }),
+      onChanged: (hour) {
+        if (hour != null) {
+          onChanged(hour);
+        }
+      },
+    );
+  }
+}
+
+class _MinuteField extends StatelessWidget {
+  const _MinuteField({
+    required this.value,
+    required this.label,
+    required this.onChanged,
+  });
+
+  final int value;
+  final String label;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<int>(
+      initialValue: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(),
+      ),
+      items: List.generate(60, (minute) {
+        return DropdownMenuItem(value: minute, child: Text(_twoDigits(minute)));
+      }),
+      onChanged: (minute) {
+        if (minute != null) {
+          onChanged(minute);
+        }
+      },
+    );
+  }
+}
+
+String _twoDigits(int value) {
+  return value.toString().padLeft(2, '0');
 }
