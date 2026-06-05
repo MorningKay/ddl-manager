@@ -2,6 +2,7 @@ import 'package:ddl_manager/app/ddl_manager_app.dart';
 import 'package:ddl_manager/features/deadlines/application/deadline_providers.dart';
 import 'package:ddl_manager/features/deadlines/data/in_memory_deadline_repository.dart';
 import 'package:ddl_manager/features/deadlines/domain/deadline.dart';
+import 'package:ddl_manager/features/deadlines/presentation/deadline_list_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -98,6 +99,33 @@ void main() {
     expect(find.textContaining('剩余'), findsOneWidget);
     expect(find.text('时间进度'), findsNothing);
     expect(find.textContaining('截止时间:'), findsNothing);
+  });
+
+  testWidgets('refreshes countdown text while the screen stays open', (
+    tester,
+  ) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+    var now = DateTime(2026, 6, 4, 12);
+    await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Live countdown',
+        dueAt: now.add(const Duration(minutes: 3)),
+        notes: '',
+        priority: DeadlinePriority.medium,
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository, nowFactory: () => now));
+    await tester.pump();
+    final initialCountdown = _singleRemainingText(tester);
+
+    now = now.add(const Duration(minutes: 2));
+    await tester.pump(const Duration(minutes: 1));
+    final updatedCountdown = _singleRemainingText(tester);
+
+    expect(initialCountdown, '剩余 3分钟');
+    expect(updatedCountdown, '剩余 1分钟');
   });
 
   testWidgets('shows overdue deadlines on the closed tab', (tester) async {
@@ -206,9 +234,15 @@ void main() {
   });
 }
 
-Widget _testApp(InMemoryDeadlineRepository repository) {
+Widget _testApp(
+  InMemoryDeadlineRepository repository, {
+  DateTime Function()? nowFactory,
+}) {
   return ProviderScope(
-    overrides: [deadlineRepositoryProvider.overrideWithValue(repository)],
+    overrides: [
+      deadlineRepositoryProvider.overrideWithValue(repository),
+      if (nowFactory != null) deadlineNowProvider.overrideWithValue(nowFactory),
+    ],
     child: const DDLManagerApp(),
   );
 }
@@ -230,4 +264,12 @@ String _formatZhDateMarker(DateTime dueAt, DateTime now) {
 
 String _twoDigits(int value) {
   return value.toString().padLeft(2, '0');
+}
+
+String _singleRemainingText(WidgetTester tester) {
+  final finder = find.byWidgetPredicate((widget) {
+    return widget is Text && widget.data?.startsWith('剩余 ') == true;
+  });
+  expect(finder, findsOneWidget);
+  return tester.widget<Text>(finder).data!;
 }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -10,6 +12,10 @@ import 'deadline_sections.dart';
 import 'deadline_strings.dart';
 import 'deadline_style.dart';
 
+final deadlineNowProvider = Provider<DateTime Function()>((ref) {
+  return DateTime.now;
+});
+
 class DeadlineListScreen extends ConsumerWidget {
   const DeadlineListScreen({super.key});
 
@@ -17,6 +23,7 @@ class DeadlineListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final language = ref.watch(appLanguageProvider);
     final strings = DeadlineStrings(language);
+    final nowFactory = ref.watch(deadlineNowProvider);
     final deadlines = ref.watch(deadlinesProvider);
 
     return DefaultTabController(
@@ -41,6 +48,7 @@ class DeadlineListScreen extends ConsumerWidget {
         body: deadlines.when(
           data: (items) => _DeadlineTabs(
             deadlines: items,
+            nowFactory: nowFactory,
             language: language,
             strings: strings,
           ),
@@ -74,50 +82,112 @@ class DeadlineListScreen extends ConsumerWidget {
   }
 }
 
-class _DeadlineTabs extends StatelessWidget {
+class _DeadlineTabs extends StatefulWidget {
   const _DeadlineTabs({
     required this.deadlines,
+    required this.nowFactory,
     required this.language,
     required this.strings,
   });
 
   final List<Deadline> deadlines;
+  final DateTime Function() nowFactory;
   final AppLanguage language;
   final DeadlineStrings strings;
 
   @override
+  State<_DeadlineTabs> createState() => _DeadlineTabsState();
+}
+
+class _DeadlineTabsState extends State<_DeadlineTabs>
+    with WidgetsBindingObserver {
+  late DateTime _now;
+  Timer? _clockTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _now = widget.nowFactory();
+    WidgetsBinding.instance.addObserver(this);
+    _scheduleClockTick();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshNow();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (deadlines.isEmpty) {
-      return _EmptyState(strings: strings);
+    if (widget.deadlines.isEmpty) {
+      return _EmptyState(strings: widget.strings);
     }
 
-    final board = buildDeadlineBoard(deadlines);
+    final board = buildDeadlineBoard(widget.deadlines, now: _now);
 
     return TabBarView(
       children: [
         _DeadlineBoardPage(
           column: board.inProgress,
-          language: language,
-          strings: strings,
+          now: _now,
+          language: widget.language,
+          strings: widget.strings,
         ),
         _DeadlineBoardPage(
           column: board.closed,
-          language: language,
-          strings: strings,
+          now: _now,
+          language: widget.language,
+          strings: widget.strings,
         ),
       ],
     );
+  }
+
+  void _refreshNow() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _now = widget.nowFactory();
+    });
+    _scheduleClockTick();
+  }
+
+  void _scheduleClockTick() {
+    _clockTimer?.cancel();
+    final now = widget.nowFactory();
+    final nextMinute = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute + 1,
+    );
+    final delay = nextMinute.difference(now);
+    _clockTimer = Timer(delay, _refreshNow);
   }
 }
 
 class _DeadlineBoardPage extends StatelessWidget {
   const _DeadlineBoardPage({
     required this.column,
+    required this.now,
     required this.language,
     required this.strings,
   });
 
   final DeadlineBoardColumn column;
+  final DateTime now;
   final AppLanguage language;
   final DeadlineStrings strings;
 
@@ -127,7 +197,6 @@ class _DeadlineBoardPage extends StatelessWidget {
       return _EmptyBoardState(kind: column.kind, strings: strings);
     }
 
-    final now = DateTime.now();
     final progressWindow = deadlineProgressWindow([
       ...column.scheduled,
       ...column.completed,
