@@ -6,7 +6,8 @@ const _minimumProgressWindow = Duration(days: 7);
 const _maximumProgressWindow = Duration(days: 365);
 const _targetRemainingNumerator = 7;
 const _targetRemainingDenominator = 10;
-const _outlierResistantItemCount = 4;
+const _outlierResistantItemCount = 8;
+const _minimumFutureProgress = 0.04;
 
 Color priorityColor(DeadlinePriority priority, ColorScheme colorScheme) {
   return switch (priority) {
@@ -110,7 +111,10 @@ double deadlineCountdownProgress(
   }
 
   final remainingSeconds = dueAt.difference(now).inSeconds;
-  return (1 - remainingSeconds / windowSeconds).clamp(0, 1).toDouble();
+  final progress = (1 - remainingSeconds / windowSeconds)
+      .clamp(0, 1)
+      .toDouble();
+  return progress < _minimumFutureProgress ? _minimumFutureProgress : progress;
 }
 
 int _typicalMaxRemainingSeconds(List<int> sortedRemainingSeconds) {
