@@ -83,6 +83,23 @@ flutter build macos
 flutter build apk --debug
 ```
 
+## Releases
+
+Public release notes are tracked in `CHANGELOG.md`. GitHub's generated release
+notes are configured through `.github/release.yml`.
+
+For a manual release:
+
+```bash
+git tag -a v0.1.0 -m "v0.1.0"
+git push origin main
+git push origin v0.1.0
+```
+
+Then draft a GitHub Release from the pushed tag and use the generated notes as
+the starting point. Signed iOS builds and Android APK/AAB release artifacts are
+not automated yet.
+
 ## Project Conventions
 
 - Public AI-assisted contribution rules are in `AGENTS.md`.
