@@ -62,6 +62,16 @@ class $DeadlineEntriesTable extends DeadlineEntries
     requiredDuringInsert: false,
     defaultValue: Constant(DeadlinePriority.medium.name),
   );
+  static const VerificationMeta _tagsMeta = const VerificationMeta('tags');
+  @override
+  late final GeneratedColumn<String> tags = GeneratedColumn<String>(
+    'tags',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _isCompletedMeta = const VerificationMeta(
     'isCompleted',
   );
@@ -106,6 +116,7 @@ class $DeadlineEntriesTable extends DeadlineEntries
     dueAt,
     notes,
     priority,
+    tags,
     isCompleted,
     createdAt,
     updatedAt,
@@ -149,6 +160,12 @@ class $DeadlineEntriesTable extends DeadlineEntries
       context.handle(
         _priorityMeta,
         priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
+      );
+    }
+    if (data.containsKey('tags')) {
+      context.handle(
+        _tagsMeta,
+        tags.isAcceptableOrUnknown(data['tags']!, _tagsMeta),
       );
     }
     if (data.containsKey('is_completed')) {
@@ -205,6 +222,10 @@ class $DeadlineEntriesTable extends DeadlineEntries
         DriftSqlType.string,
         data['${effectivePrefix}priority'],
       )!,
+      tags: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags'],
+      )!,
       isCompleted: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_completed'],
@@ -232,6 +253,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
   final DateTime? dueAt;
   final String notes;
   final String priority;
+  final String tags;
   final bool isCompleted;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -241,6 +263,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     this.dueAt,
     required this.notes,
     required this.priority,
+    required this.tags,
     required this.isCompleted,
     required this.createdAt,
     required this.updatedAt,
@@ -255,6 +278,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     }
     map['notes'] = Variable<String>(notes);
     map['priority'] = Variable<String>(priority);
+    map['tags'] = Variable<String>(tags);
     map['is_completed'] = Variable<bool>(isCompleted);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['updated_at'] = Variable<DateTime>(updatedAt);
@@ -270,6 +294,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
           : Value(dueAt),
       notes: Value(notes),
       priority: Value(priority),
+      tags: Value(tags),
       isCompleted: Value(isCompleted),
       createdAt: Value(createdAt),
       updatedAt: Value(updatedAt),
@@ -287,6 +312,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
       dueAt: serializer.fromJson<DateTime?>(json['dueAt']),
       notes: serializer.fromJson<String>(json['notes']),
       priority: serializer.fromJson<String>(json['priority']),
+      tags: serializer.fromJson<String>(json['tags']),
       isCompleted: serializer.fromJson<bool>(json['isCompleted']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
@@ -301,6 +327,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
       'dueAt': serializer.toJson<DateTime?>(dueAt),
       'notes': serializer.toJson<String>(notes),
       'priority': serializer.toJson<String>(priority),
+      'tags': serializer.toJson<String>(tags),
       'isCompleted': serializer.toJson<bool>(isCompleted),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'updatedAt': serializer.toJson<DateTime>(updatedAt),
@@ -313,6 +340,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     Value<DateTime?> dueAt = const Value.absent(),
     String? notes,
     String? priority,
+    String? tags,
     bool? isCompleted,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -322,6 +350,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     dueAt: dueAt.present ? dueAt.value : this.dueAt,
     notes: notes ?? this.notes,
     priority: priority ?? this.priority,
+    tags: tags ?? this.tags,
     isCompleted: isCompleted ?? this.isCompleted,
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
@@ -333,6 +362,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
       dueAt: data.dueAt.present ? data.dueAt.value : this.dueAt,
       notes: data.notes.present ? data.notes.value : this.notes,
       priority: data.priority.present ? data.priority.value : this.priority,
+      tags: data.tags.present ? data.tags.value : this.tags,
       isCompleted: data.isCompleted.present
           ? data.isCompleted.value
           : this.isCompleted,
@@ -349,6 +379,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
           ..write('dueAt: $dueAt, ')
           ..write('notes: $notes, ')
           ..write('priority: $priority, ')
+          ..write('tags: $tags, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -363,6 +394,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
     dueAt,
     notes,
     priority,
+    tags,
     isCompleted,
     createdAt,
     updatedAt,
@@ -376,6 +408,7 @@ class DeadlineRow extends DataClass implements Insertable<DeadlineRow> {
           other.dueAt == this.dueAt &&
           other.notes == this.notes &&
           other.priority == this.priority &&
+          other.tags == this.tags &&
           other.isCompleted == this.isCompleted &&
           other.createdAt == this.createdAt &&
           other.updatedAt == this.updatedAt);
@@ -387,6 +420,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
   final Value<DateTime?> dueAt;
   final Value<String> notes;
   final Value<String> priority;
+  final Value<String> tags;
   final Value<bool> isCompleted;
   final Value<DateTime> createdAt;
   final Value<DateTime> updatedAt;
@@ -396,6 +430,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
     this.dueAt = const Value.absent(),
     this.notes = const Value.absent(),
     this.priority = const Value.absent(),
+    this.tags = const Value.absent(),
     this.isCompleted = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
@@ -406,6 +441,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
     this.dueAt = const Value.absent(),
     this.notes = const Value.absent(),
     this.priority = const Value.absent(),
+    this.tags = const Value.absent(),
     this.isCompleted = const Value.absent(),
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -418,6 +454,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
     Expression<DateTime>? dueAt,
     Expression<String>? notes,
     Expression<String>? priority,
+    Expression<String>? tags,
     Expression<bool>? isCompleted,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
@@ -428,6 +465,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
       if (dueAt != null) 'due_at': dueAt,
       if (notes != null) 'notes': notes,
       if (priority != null) 'priority': priority,
+      if (tags != null) 'tags': tags,
       if (isCompleted != null) 'is_completed': isCompleted,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
@@ -440,6 +478,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
     Value<DateTime?>? dueAt,
     Value<String>? notes,
     Value<String>? priority,
+    Value<String>? tags,
     Value<bool>? isCompleted,
     Value<DateTime>? createdAt,
     Value<DateTime>? updatedAt,
@@ -450,6 +489,7 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
       dueAt: dueAt ?? this.dueAt,
       notes: notes ?? this.notes,
       priority: priority ?? this.priority,
+      tags: tags ?? this.tags,
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -474,6 +514,9 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
     if (priority.present) {
       map['priority'] = Variable<String>(priority.value);
     }
+    if (tags.present) {
+      map['tags'] = Variable<String>(tags.value);
+    }
     if (isCompleted.present) {
       map['is_completed'] = Variable<bool>(isCompleted.value);
     }
@@ -494,9 +537,260 @@ class DeadlineEntriesCompanion extends UpdateCompanion<DeadlineRow> {
           ..write('dueAt: $dueAt, ')
           ..write('notes: $notes, ')
           ..write('priority: $priority, ')
+          ..write('tags: $tags, ')
           ..write('isCompleted: $isCompleted, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $QuickTagEntriesTable extends QuickTagEntries
+    with TableInfo<$QuickTagEntriesTable, QuickTagRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $QuickTagEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'quick_tag_entries';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<QuickTagRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  QuickTagRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return QuickTagRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $QuickTagEntriesTable createAlias(String alias) {
+    return $QuickTagEntriesTable(attachedDatabase, alias);
+  }
+}
+
+class QuickTagRow extends DataClass implements Insertable<QuickTagRow> {
+  final int id;
+  final String name;
+  final DateTime createdAt;
+  const QuickTagRow({
+    required this.id,
+    required this.name,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  QuickTagEntriesCompanion toCompanion(bool nullToAbsent) {
+    return QuickTagEntriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory QuickTagRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return QuickTagRow(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  QuickTagRow copyWith({int? id, String? name, DateTime? createdAt}) =>
+      QuickTagRow(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAt: createdAt ?? this.createdAt,
+      );
+  QuickTagRow copyWithCompanion(QuickTagEntriesCompanion data) {
+    return QuickTagRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuickTagRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is QuickTagRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAt == this.createdAt);
+}
+
+class QuickTagEntriesCompanion extends UpdateCompanion<QuickTagRow> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<DateTime> createdAt;
+  const QuickTagEntriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  QuickTagEntriesCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    required DateTime createdAt,
+  }) : name = Value(name),
+       createdAt = Value(createdAt);
+  static Insertable<QuickTagRow> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  QuickTagEntriesCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<DateTime>? createdAt,
+  }) {
+    return QuickTagEntriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('QuickTagEntriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
@@ -508,11 +802,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $DeadlineEntriesTable deadlineEntries = $DeadlineEntriesTable(
     this,
   );
+  late final $QuickTagEntriesTable quickTagEntries = $QuickTagEntriesTable(
+    this,
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
-  List<DatabaseSchemaEntity> get allSchemaEntities => [deadlineEntries];
+  List<DatabaseSchemaEntity> get allSchemaEntities => [
+    deadlineEntries,
+    quickTagEntries,
+  ];
 }
 
 typedef $$DeadlineEntriesTableCreateCompanionBuilder =
@@ -522,6 +822,7 @@ typedef $$DeadlineEntriesTableCreateCompanionBuilder =
       Value<DateTime?> dueAt,
       Value<String> notes,
       Value<String> priority,
+      Value<String> tags,
       Value<bool> isCompleted,
       required DateTime createdAt,
       required DateTime updatedAt,
@@ -533,6 +834,7 @@ typedef $$DeadlineEntriesTableUpdateCompanionBuilder =
       Value<DateTime?> dueAt,
       Value<String> notes,
       Value<String> priority,
+      Value<String> tags,
       Value<bool> isCompleted,
       Value<DateTime> createdAt,
       Value<DateTime> updatedAt,
@@ -569,6 +871,11 @@ class $$DeadlineEntriesTableFilterComposer
 
   ColumnFilters<String> get priority => $composableBuilder(
     column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tags => $composableBuilder(
+    column: $table.tags,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -622,6 +929,11 @@ class $$DeadlineEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tags => $composableBuilder(
+    column: $table.tags,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isCompleted => $composableBuilder(
     column: $table.isCompleted,
     builder: (column) => ColumnOrderings(column),
@@ -661,6 +973,9 @@ class $$DeadlineEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get priority =>
       $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get tags =>
+      $composableBuilder(column: $table.tags, builder: (column) => column);
 
   GeneratedColumn<bool> get isCompleted => $composableBuilder(
     column: $table.isCompleted,
@@ -712,6 +1027,7 @@ class $$DeadlineEntriesTableTableManager
                 Value<DateTime?> dueAt = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<String> priority = const Value.absent(),
+                Value<String> tags = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime> updatedAt = const Value.absent(),
@@ -721,6 +1037,7 @@ class $$DeadlineEntriesTableTableManager
                 dueAt: dueAt,
                 notes: notes,
                 priority: priority,
+                tags: tags,
                 isCompleted: isCompleted,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -732,6 +1049,7 @@ class $$DeadlineEntriesTableTableManager
                 Value<DateTime?> dueAt = const Value.absent(),
                 Value<String> notes = const Value.absent(),
                 Value<String> priority = const Value.absent(),
+                Value<String> tags = const Value.absent(),
                 Value<bool> isCompleted = const Value.absent(),
                 required DateTime createdAt,
                 required DateTime updatedAt,
@@ -741,6 +1059,7 @@ class $$DeadlineEntriesTableTableManager
                 dueAt: dueAt,
                 notes: notes,
                 priority: priority,
+                tags: tags,
                 isCompleted: isCompleted,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
@@ -770,10 +1089,170 @@ typedef $$DeadlineEntriesTableProcessedTableManager =
       DeadlineRow,
       PrefetchHooks Function()
     >;
+typedef $$QuickTagEntriesTableCreateCompanionBuilder =
+    QuickTagEntriesCompanion Function({
+      Value<int> id,
+      required String name,
+      required DateTime createdAt,
+    });
+typedef $$QuickTagEntriesTableUpdateCompanionBuilder =
+    QuickTagEntriesCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<DateTime> createdAt,
+    });
+
+class $$QuickTagEntriesTableFilterComposer
+    extends Composer<_$AppDatabase, $QuickTagEntriesTable> {
+  $$QuickTagEntriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$QuickTagEntriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $QuickTagEntriesTable> {
+  $$QuickTagEntriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$QuickTagEntriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $QuickTagEntriesTable> {
+  $$QuickTagEntriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$QuickTagEntriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $QuickTagEntriesTable,
+          QuickTagRow,
+          $$QuickTagEntriesTableFilterComposer,
+          $$QuickTagEntriesTableOrderingComposer,
+          $$QuickTagEntriesTableAnnotationComposer,
+          $$QuickTagEntriesTableCreateCompanionBuilder,
+          $$QuickTagEntriesTableUpdateCompanionBuilder,
+          (
+            QuickTagRow,
+            BaseReferences<_$AppDatabase, $QuickTagEntriesTable, QuickTagRow>,
+          ),
+          QuickTagRow,
+          PrefetchHooks Function()
+        > {
+  $$QuickTagEntriesTableTableManager(
+    _$AppDatabase db,
+    $QuickTagEntriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$QuickTagEntriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$QuickTagEntriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$QuickTagEntriesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => QuickTagEntriesCompanion(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                required DateTime createdAt,
+              }) => QuickTagEntriesCompanion.insert(
+                id: id,
+                name: name,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$QuickTagEntriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $QuickTagEntriesTable,
+      QuickTagRow,
+      $$QuickTagEntriesTableFilterComposer,
+      $$QuickTagEntriesTableOrderingComposer,
+      $$QuickTagEntriesTableAnnotationComposer,
+      $$QuickTagEntriesTableCreateCompanionBuilder,
+      $$QuickTagEntriesTableUpdateCompanionBuilder,
+      (
+        QuickTagRow,
+        BaseReferences<_$AppDatabase, $QuickTagEntriesTable, QuickTagRow>,
+      ),
+      QuickTagRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$DeadlineEntriesTableTableManager get deadlineEntries =>
       $$DeadlineEntriesTableTableManager(_db, _db.deadlineEntries);
+  $$QuickTagEntriesTableTableManager get quickTagEntries =>
+      $$QuickTagEntriesTableTableManager(_db, _db.quickTagEntries);
 }

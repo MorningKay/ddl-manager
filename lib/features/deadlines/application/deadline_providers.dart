@@ -22,3 +22,7 @@ final deadlineRepositoryProvider = Provider<DeadlineRepository>((ref) {
 final deadlinesProvider = StreamProvider<List<Deadline>>((ref) {
   return ref.watch(deadlineRepositoryProvider).watchDeadlines();
 });
+
+final quickTagsProvider = StreamProvider<List<String>>((ref) {
+  return ref.watch(deadlineRepositoryProvider).watchQuickTags();
+});

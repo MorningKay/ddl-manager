@@ -14,12 +14,14 @@ class DeadlineDraft {
     required this.dueAt,
     required this.notes,
     required this.priority,
+    this.tags = const [],
   });
 
   final String title;
   final DateTime? dueAt;
   final String notes;
   final DeadlinePriority priority;
+  final List<String> tags;
 }
 
 class Deadline {
@@ -32,6 +34,7 @@ class Deadline {
     required this.isCompleted,
     required this.createdAt,
     required this.updatedAt,
+    this.tags = const [],
   });
 
   final int id;
@@ -42,6 +45,7 @@ class Deadline {
   final bool isCompleted;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<String> tags;
 
   Deadline copyWith({
     int? id,
@@ -53,6 +57,7 @@ class Deadline {
     bool? isCompleted,
     DateTime? createdAt,
     DateTime? updatedAt,
+    List<String>? tags,
   }) {
     return Deadline(
       id: id ?? this.id,
@@ -63,6 +68,7 @@ class Deadline {
       isCompleted: isCompleted ?? this.isCompleted,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      tags: tags ?? this.tags,
     );
   }
 }
@@ -99,4 +105,21 @@ DeadlinePriority parseDeadlinePriority(String value) {
     (priority) => priority.name == value,
     orElse: () => DeadlinePriority.medium,
   );
+}
+
+List<String> normalizeDeadlineTags(Iterable<String> tags) {
+  final seen = <String>{};
+  final normalized = <String>[];
+
+  for (final tag in tags) {
+    final cleaned = tag.trim();
+    if (cleaned.isEmpty || seen.contains(cleaned)) {
+      continue;
+    }
+
+    seen.add(cleaned);
+    normalized.add(cleaned);
+  }
+
+  return List.unmodifiable(normalized);
 }

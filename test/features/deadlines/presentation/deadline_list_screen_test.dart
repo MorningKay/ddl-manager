@@ -56,6 +56,181 @@ void main() {
     expect(find.text('进行中'), findsOneWidget);
   });
 
+  testWidgets('adds tags from the bottom sheet and shows them on the card', (
+    tester,
+  ) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('添加 Deadline'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'Tagged task');
+    await tester.enterText(find.widgetWithText(TextFormField, '输入标签'), '作业');
+    await tester.tap(find.byTooltip('添加标签'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.widgetWithText(TextFormField, '输入标签'), '考试');
+    await tester.tap(find.byTooltip('添加标签'));
+    await tester.pumpAndSettle();
+    await _tapSave(tester);
+
+    final deadlines = await repository.listDeadlines();
+    expect(deadlines.single.tags, ['作业', '考试']);
+    expect(find.text('Tagged task'), findsOneWidget);
+    expect(find.text('作业'), findsAtLeastNWidgets(1));
+    expect(find.text('考试'), findsAtLeastNWidgets(1));
+  });
+
+  testWidgets('starts with no quick tags and lets users edit them', (
+    tester,
+  ) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('添加 Deadline'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('快捷标签'), findsNothing);
+    expect(find.widgetWithText(InputChip, '作业'), findsNothing);
+
+    await tester.enterText(find.byType(TextFormField).first, 'Tagged task');
+    await tester.enterText(find.widgetWithText(TextFormField, '输入标签'), '夏令营');
+    await tester.tap(find.byTooltip('添加标签'));
+    await tester.pumpAndSettle();
+
+    expect(await repository.listQuickTags(), ['夏令营']);
+    expect(find.text('快捷标签'), findsOneWidget);
+    expect(find.widgetWithText(InputChip, '夏令营'), findsNWidgets(2));
+
+    await tester.tap(find.byTooltip('删除快捷标签'));
+    await tester.pumpAndSettle();
+    expect(await repository.listQuickTags(), isEmpty);
+    expect(find.widgetWithText(InputChip, '夏令营'), findsOneWidget);
+
+    await _tapSave(tester);
+
+    final deadlines = await repository.listDeadlines();
+    expect(deadlines.single.tags, ['夏令营']);
+  });
+
+  testWidgets('saves an unsubmitted tag input as a quick tag', (tester) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+
+    await tester.pumpWidget(_testApp(repository));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('添加 Deadline'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'Direct save tag');
+    await tester.enterText(find.widgetWithText(TextFormField, '输入标签'), '考试');
+    await _tapSave(tester);
+
+    final deadlines = await repository.listDeadlines();
+    expect(deadlines.single.tags, ['考试']);
+    expect(await repository.listQuickTags(), ['考试']);
+  });
+
+  testWidgets('filters deadlines by all selected tags', (tester) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+    final now = DateTime(2026, 6, 4, 12);
+    await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Required exam',
+        dueAt: now.add(const Duration(days: 1)),
+        notes: '',
+        priority: DeadlinePriority.high,
+        tags: ['必修课', '考试'],
+      ),
+    );
+    await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Summer camp',
+        dueAt: now.add(const Duration(days: 2)),
+        notes: '',
+        priority: DeadlinePriority.medium,
+        tags: ['科学院', '夏令营'],
+      ),
+    );
+    await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Standalone exam',
+        dueAt: now.add(const Duration(days: 3)),
+        notes: '',
+        priority: DeadlinePriority.low,
+        tags: ['考试'],
+      ),
+    );
+
+    await tester.pumpWidget(_testApp(repository, nowFactory: () => now));
+    await tester.pump();
+
+    expect(find.text('Required exam'), findsOneWidget);
+    expect(find.text('Summer camp'), findsOneWidget);
+    expect(find.text('Standalone exam'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilterChip, '考试').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Required exam'), findsOneWidget);
+    expect(find.text('Standalone exam'), findsOneWidget);
+    expect(find.text('Summer camp'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilterChip, '必修课').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Required exam'), findsOneWidget);
+    expect(find.text('Standalone exam'), findsNothing);
+    expect(find.text('Summer camp'), findsNothing);
+
+    await tester.tap(find.byTooltip('展开标签').first);
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('收起标签'), findsWidgets);
+
+    await tester.tap(find.widgetWithText(FilterChip, '全部').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Required exam'), findsOneWidget);
+    expect(find.text('Summer camp'), findsOneWidget);
+    expect(find.text('Standalone exam'), findsOneWidget);
+  });
+
+  testWidgets('keeps the collapsed tag expand button pinned right', (
+    tester,
+  ) async {
+    final repository = InMemoryDeadlineRepository();
+    addTearDown(repository.close);
+    final now = DateTime(2026, 6, 4, 12);
+
+    for (var index = 0; index < 12; index += 1) {
+      await repository.createDeadline(
+        DeadlineDraft(
+          title: 'Tagged task $index',
+          dueAt: now.add(Duration(days: index + 1)),
+          notes: '',
+          priority: DeadlinePriority.medium,
+          tags: ['标签$index'],
+        ),
+      );
+    }
+
+    await tester.pumpWidget(_testApp(repository, nowFactory: () => now));
+    await tester.pump();
+
+    final expandButton = find.byTooltip('展开标签');
+    expect(expandButton, findsOneWidget);
+
+    final scaffoldWidth = tester.getSize(find.byType(Scaffold)).width;
+    final buttonRight = tester.getTopRight(expandButton).dx;
+    expect(buttonRight, greaterThan(scaffoldWidth - 80));
+  });
+
   testWidgets('adds a deadline with unannounced date', (tester) async {
     final repository = InMemoryDeadlineRepository();
     addTearDown(repository.close);

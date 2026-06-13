@@ -14,6 +14,14 @@ class DeadlineStrings {
   String get title => _isZh ? '标题' : 'Title';
   String get titleRequired => _isZh ? '标题不能为空' : 'Title is required';
   String get notes => _isZh ? '备注' : 'Notes';
+  String get tags => _isZh ? '标签' : 'Tags';
+  String get tagInput => _isZh ? '输入标签' : 'Add a tag';
+  String get addTag => _isZh ? '添加标签' : 'Add tag';
+  String get quickTags => _isZh ? '快捷标签' : 'Quick tags';
+  String get deleteQuickTag => _isZh ? '删除快捷标签' : 'Delete quick tag';
+  String get allTags => _isZh ? '全部' : 'All';
+  String get expandTags => _isZh ? '展开标签' : 'Expand tags';
+  String get collapseTags => _isZh ? '收起标签' : 'Collapse tags';
   String get dueTime => _isZh ? 'Deadline 时间' : 'Due time';
   String get dateKnown => _isZh ? '日期已公布' : 'Date announced';
   String get dateUnannounced => _isZh ? '日期未公布' : 'Date TBA';
@@ -25,6 +33,7 @@ class DeadlineStrings {
   String get languageLabel => _isZh ? '语言' : 'Language';
   String get chinese => '中文';
   String get english => 'English';
+
   String get deadlineActions => _isZh ? 'Deadline 操作' : 'Deadline actions';
   String get edit => _isZh ? '编辑' : 'Edit';
   String get delete => _isZh ? '删除' : 'Delete';
@@ -43,6 +52,10 @@ class DeadlineStrings {
   String get noClosedBody => _isZh
       ? '超过 Deadline 时间且未完成的项目会出现在这里。'
       : 'Deadlines past their due time will show up here.';
+  String get noMatchingTagsTitle =>
+      _isZh ? '没有匹配标签的 Deadline' : 'No matching deadlines';
+  String get noMatchingTagsBody =>
+      _isZh ? '调整标签筛选后再看看。' : 'Adjust the tag filters and try again.';
   String get exactDeadline => _isZh ? '截止时间' : 'Deadline';
   String get progress => _isZh ? '时间进度' : 'Time progress';
 

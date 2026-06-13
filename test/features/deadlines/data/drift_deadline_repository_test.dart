@@ -28,6 +28,7 @@ void main() {
         dueAt: dueAt,
         notes: 'Final draft',
         priority: DeadlinePriority.high,
+        tags: ['作业', '考试'],
       ),
     );
 
@@ -38,6 +39,7 @@ void main() {
     expect(deadlines.single.dueAt, dueAt);
     expect(deadlines.single.notes, 'Final draft');
     expect(deadlines.single.priority, DeadlinePriority.high);
+    expect(deadlines.single.tags, ['作业', '考试']);
     expect(deadlines.single.isCompleted, isFalse);
   });
 
@@ -76,6 +78,7 @@ void main() {
         dueAt: DateTime(2026, 6, 11, 9, 30),
         notes: 'Updated notes',
         priority: DeadlinePriority.low,
+        tags: ['必修课', ' 考试 ', '必修课', ''],
       ),
     );
 
@@ -85,7 +88,50 @@ void main() {
     expect(after.dueAt, DateTime(2026, 6, 11, 9, 30));
     expect(after.notes, 'Updated notes');
     expect(after.priority, DeadlinePriority.low);
+    expect(after.tags, ['必修课', '考试']);
     expect(after.updatedAt.isAfter(before.updatedAt), isTrue);
+  });
+
+  test('update can clear tags', () async {
+    final id = await repository.createDeadline(
+      DeadlineDraft(
+        title: 'Tagged item',
+        dueAt: DateTime(2026, 6, 10, 17),
+        notes: '',
+        priority: DeadlinePriority.medium,
+        tags: ['作业'],
+      ),
+    );
+
+    currentTime = DateTime(2026, 6, 1, 10);
+    await repository.updateDeadline(
+      id,
+      DeadlineDraft(
+        title: 'Tagged item',
+        dueAt: DateTime(2026, 6, 10, 17),
+        notes: '',
+        priority: DeadlinePriority.medium,
+        tags: const [],
+      ),
+    );
+
+    final after = (await repository.listDeadlines()).single;
+
+    expect(after.tags, isEmpty);
+  });
+
+  test('quick tags start empty and can be edited', () async {
+    expect(await repository.listQuickTags(), isEmpty);
+
+    await repository.addQuickTag(' 作业 ');
+    await repository.addQuickTag('考试');
+    await repository.addQuickTag('作业');
+
+    expect(await repository.listQuickTags(), ['作业', '考试']);
+
+    await repository.deleteQuickTag('作业');
+
+    expect(await repository.listQuickTags(), ['考试']);
   });
 
   test('update can clear the due date', () async {

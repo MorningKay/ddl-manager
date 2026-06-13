@@ -21,8 +21,10 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _notesController;
+  late final TextEditingController _tagController;
   late DateTime _dueAt;
   late DeadlinePriority _priority;
+  late List<String> _tags;
   late bool _isDateUnannounced;
   bool _isSaving = false;
 
@@ -34,8 +36,10 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
     final deadline = widget.deadline;
     _titleController = TextEditingController(text: deadline?.title ?? '');
     _notesController = TextEditingController(text: deadline?.notes ?? '');
+    _tagController = TextEditingController();
     _dueAt = deadline?.dueAt ?? _defaultDueAt();
     _priority = deadline?.priority ?? DeadlinePriority.medium;
+    _tags = normalizeDeadlineTags(deadline?.tags ?? const []);
     _isDateUnannounced = deadline != null && deadline.dueAt == null;
   }
 
@@ -43,6 +47,7 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
   void dispose() {
     _titleController.dispose();
     _notesController.dispose();
+    _tagController.dispose();
     super.dispose();
   }
 
@@ -51,6 +56,9 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
     final language = ref.watch(appLanguageProvider);
     final strings = DeadlineStrings(language);
     final colorScheme = Theme.of(context).colorScheme;
+    final quickTags = ref
+        .watch(quickTagsProvider)
+        .maybeWhen(data: (items) => items, orElse: () => const <String>[]);
 
     return SafeArea(
       child: Padding(
@@ -96,6 +104,67 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
                   minLines: 2,
                   maxLines: 4,
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  strings.tags,
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _tagController,
+                  decoration: InputDecoration(
+                    labelText: strings.tagInput,
+                    border: OutlineInputBorder(),
+                    suffixIcon: IconButton(
+                      tooltip: strings.addTag,
+                      onPressed: () => _addTag(),
+                      icon: const Icon(Icons.add),
+                    ),
+                  ),
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    _addTag();
+                  },
+                ),
+                if (_tags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final tag in _tags)
+                        InputChip(
+                          label: Text(tag),
+                          visualDensity: VisualDensity.compact,
+                          onDeleted: () => _removeTag(tag),
+                        ),
+                    ],
+                  ),
+                ],
+                if (quickTags.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    strings.quickTags,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final tag in quickTags)
+                        InputChip(
+                          label: Text(tag),
+                          selected: _tags.contains(tag),
+                          visualDensity: VisualDensity.compact,
+                          deleteIcon: const Icon(Icons.close, size: 16),
+                          deleteButtonTooltipMessage: strings.deleteQuickTag,
+                          onPressed: () => _addTag(tag),
+                          onDeleted: () => _deleteQuickTag(tag),
+                        ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 16),
                 Text(
                   strings.dueTime,
@@ -245,15 +314,21 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
       _isSaving = true;
     });
 
-    final draft = DeadlineDraft(
-      title: _titleController.text,
-      dueAt: _isDateUnannounced ? null : _dueAt,
-      notes: _notesController.text,
-      priority: _priority,
-    );
-
     try {
       final repository = ref.read(deadlineRepositoryProvider);
+      final tags = normalizeDeadlineTags([..._tags, _tagController.text]);
+      for (final tag in tags) {
+        await repository.addQuickTag(tag);
+      }
+
+      final draft = DeadlineDraft(
+        title: _titleController.text,
+        dueAt: _isDateUnannounced ? null : _dueAt,
+        notes: _notesController.text,
+        priority: _priority,
+        tags: tags,
+      );
+
       final deadline = widget.deadline;
       if (deadline == null) {
         await repository.createDeadline(draft);
@@ -279,6 +354,35 @@ class _DeadlineFormSheetState extends ConsumerState<DeadlineFormSheet> {
   DateTime _defaultDueAt() {
     final now = DateTime.now();
     return DateTime(now.year, now.month, now.day + 1, 17);
+  }
+
+  Future<void> _addTag([String? rawTag]) async {
+    final isInputTag = rawTag == null;
+    final cleaned = (rawTag ?? _tagController.text).trim();
+    if (cleaned.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _tags = normalizeDeadlineTags([..._tags, cleaned]);
+      if (isInputTag) {
+        _tagController.clear();
+      }
+    });
+
+    if (isInputTag) {
+      await ref.read(deadlineRepositoryProvider).addQuickTag(cleaned);
+    }
+  }
+
+  void _removeTag(String tag) {
+    setState(() {
+      _tags = _tags.where((item) => item != tag).toList(growable: false);
+    });
+  }
+
+  Future<void> _deleteQuickTag(String tag) async {
+    await ref.read(deadlineRepositoryProvider).deleteQuickTag(tag);
   }
 }
 

@@ -13,5 +13,13 @@ abstract class DeadlineRepository {
 
   Future<void> toggleCompleted(int id, bool isCompleted);
 
+  Stream<List<String>> watchQuickTags();
+
+  Future<List<String>> listQuickTags();
+
+  Future<void> addQuickTag(String tag);
+
+  Future<void> deleteQuickTag(String tag);
+
   Future<void> close();
 }

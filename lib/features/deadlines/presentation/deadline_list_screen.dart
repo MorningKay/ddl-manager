@@ -103,6 +103,8 @@ class _DeadlineTabsState extends State<_DeadlineTabs>
     with WidgetsBindingObserver {
   late DateTime _now;
   Timer? _clockTimer;
+  final Set<String> _selectedTags = {};
+  bool _tagsExpanded = false;
 
   @override
   void initState() {
@@ -127,26 +129,52 @@ class _DeadlineTabsState extends State<_DeadlineTabs>
   }
 
   @override
+  void didUpdateWidget(covariant _DeadlineTabs oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final availableTags = deadlineTagOptions(widget.deadlines).toSet();
+    _selectedTags.removeWhere((tag) => !availableTags.contains(tag));
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (widget.deadlines.isEmpty) {
       return _EmptyState(strings: widget.strings);
     }
 
     final board = buildDeadlineBoard(widget.deadlines, now: _now);
+    final tagOptions = deadlineTagOptions(widget.deadlines);
+    final selectedTags = Set<String>.unmodifiable(_selectedTags);
 
     return TabBarView(
       children: [
         _DeadlineBoardPage(
-          column: board.inProgress,
+          column: filterDeadlineBoardColumnByTags(
+            board.inProgress,
+            selectedTags,
+          ),
+          hasActiveFilter: selectedTags.isNotEmpty,
           now: _now,
           language: widget.language,
           strings: widget.strings,
+          tagOptions: tagOptions,
+          selectedTags: selectedTags,
+          tagsExpanded: _tagsExpanded,
+          onAllTagsSelected: _clearTagFilter,
+          onTagToggled: _toggleTagFilter,
+          onTagsExpandedChanged: _setTagsExpanded,
         ),
         _DeadlineBoardPage(
-          column: board.closed,
+          column: filterDeadlineBoardColumnByTags(board.closed, selectedTags),
+          hasActiveFilter: selectedTags.isNotEmpty,
           now: _now,
           language: widget.language,
           strings: widget.strings,
+          tagOptions: tagOptions,
+          selectedTags: selectedTags,
+          tagsExpanded: _tagsExpanded,
+          onAllTagsSelected: _clearTagFilter,
+          onTagToggled: _toggleTagFilter,
+          onTagsExpandedChanged: _setTagsExpanded,
         ),
       ],
     );
@@ -176,24 +204,60 @@ class _DeadlineTabsState extends State<_DeadlineTabs>
     final delay = nextMinute.difference(now);
     _clockTimer = Timer(delay, _refreshNow);
   }
+
+  void _clearTagFilter() {
+    setState(() {
+      _selectedTags.clear();
+    });
+  }
+
+  void _toggleTagFilter(String tag) {
+    setState(() {
+      if (_selectedTags.contains(tag)) {
+        _selectedTags.remove(tag);
+      } else {
+        _selectedTags.add(tag);
+      }
+    });
+  }
+
+  void _setTagsExpanded(bool isExpanded) {
+    setState(() {
+      _tagsExpanded = isExpanded;
+    });
+  }
 }
 
 class _DeadlineBoardPage extends StatelessWidget {
   const _DeadlineBoardPage({
     required this.column,
+    required this.hasActiveFilter,
     required this.now,
     required this.language,
     required this.strings,
+    required this.tagOptions,
+    required this.selectedTags,
+    required this.tagsExpanded,
+    required this.onAllTagsSelected,
+    required this.onTagToggled,
+    required this.onTagsExpandedChanged,
   });
 
   final DeadlineBoardColumn column;
+  final bool hasActiveFilter;
   final DateTime now;
   final AppLanguage language;
   final DeadlineStrings strings;
+  final List<String> tagOptions;
+  final Set<String> selectedTags;
+  final bool tagsExpanded;
+  final VoidCallback onAllTagsSelected;
+  final ValueChanged<String> onTagToggled;
+  final ValueChanged<bool> onTagsExpandedChanged;
 
   @override
   Widget build(BuildContext context) {
-    if (column.isEmpty) {
+    if (column.isEmpty && !hasActiveFilter) {
       return _EmptyBoardState(kind: column.kind, strings: strings);
     }
 
@@ -205,6 +269,19 @@ class _DeadlineBoardPage extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
       children: [
+        if (tagOptions.isNotEmpty) ...[
+          _TagFilterBar(
+            tags: tagOptions,
+            selectedTags: selectedTags,
+            isExpanded: tagsExpanded,
+            strings: strings,
+            onAllSelected: onAllTagsSelected,
+            onTagToggled: onTagToggled,
+            onExpandedChanged: onTagsExpandedChanged,
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (column.isEmpty) ...[_EmptyTagFilterState(strings: strings)],
         if (column.scheduled.isNotEmpty)
           for (final deadline in column.scheduled) ...[
             _DeadlineCard(
@@ -242,6 +319,108 @@ class _DeadlineBoardPage extends StatelessWidget {
           ],
         ],
       ],
+    );
+  }
+}
+
+class _TagFilterBar extends StatelessWidget {
+  const _TagFilterBar({
+    required this.tags,
+    required this.selectedTags,
+    required this.isExpanded,
+    required this.strings,
+    required this.onAllSelected,
+    required this.onTagToggled,
+    required this.onExpandedChanged,
+  });
+
+  final List<String> tags;
+  final Set<String> selectedTags;
+  final bool isExpanded;
+  final DeadlineStrings strings;
+  final VoidCallback onAllSelected;
+  final ValueChanged<String> onTagToggled;
+  final ValueChanged<bool> onExpandedChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final chips = [
+      _TagFilterChip(
+        label: strings.allTags,
+        isSelected: selectedTags.isEmpty,
+        onSelected: onAllSelected,
+      ),
+      for (final tag in tags)
+        _TagFilterChip(
+          label: tag,
+          isSelected: selectedTags.contains(tag),
+          onSelected: () => onTagToggled(tag),
+        ),
+    ];
+
+    if (isExpanded) {
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          ...chips,
+          IconButton.outlined(
+            tooltip: strings.collapseTags,
+            onPressed: () => onExpandedChanged(false),
+            icon: const Icon(Icons.expand_less),
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: SizedBox(
+            height: 40,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemBuilder: (context, index) => chips[index],
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemCount: chips.length,
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton.outlined(
+          tooltip: strings.expandTags,
+          onPressed: () => onExpandedChanged(true),
+          icon: const Icon(Icons.expand_more),
+        ),
+      ],
+    );
+  }
+}
+
+class _TagFilterChip extends StatelessWidget {
+  const _TagFilterChip({
+    required this.label,
+    required this.isSelected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      label: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 128),
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+      selected: isSelected,
+      showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+      avatar: Icon(isSelected ? Icons.check : Icons.sell, size: 16),
+      onSelected: (_) => onSelected(),
     );
   }
 }
@@ -381,6 +560,10 @@ class _DeadlineCard extends ConsumerWidget {
                                           ).textTheme.bodySmall,
                                         ),
                                       ],
+                                      if (deadline.tags.isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        _DeadlineTagWrap(tags: deadline.tags),
+                                      ],
                                     ],
                                   ),
                                 ),
@@ -443,6 +626,56 @@ class _DeadlineCard extends ConsumerWidget {
       case _DeadlineAction.delete:
         await ref.read(deadlineRepositoryProvider).deleteDeadline(deadline.id);
     }
+  }
+}
+
+class _DeadlineTagWrap extends StatelessWidget {
+  const _DeadlineTagWrap({required this.tags});
+
+  final List<String> tags;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 6,
+      runSpacing: 5,
+      children: [for (final tag in tags) _DeadlineTagPill(label: tag)],
+    );
+  }
+}
+
+class _DeadlineTagPill extends StatelessWidget {
+  const _DeadlineTagPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = colorScheme.primary;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 120),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -673,6 +906,39 @@ class _EmptyBoardState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _EmptyTagFilterState extends StatelessWidget {
+  const _EmptyTagFilterState({required this.strings});
+
+  final DeadlineStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sell_outlined, size: 42, color: colorScheme.primary),
+          const SizedBox(height: 14),
+          Text(
+            strings.noMatchingTagsTitle,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            strings.noMatchingTagsBody,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+        ],
       ),
     );
   }

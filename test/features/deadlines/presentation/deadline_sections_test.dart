@@ -47,6 +47,46 @@ void main() {
       'Completed closed',
     ]);
   });
+
+  test('collects tag options and filters by all selected tags', () {
+    final now = DateTime(2026, 6, 4, 12);
+    final board = buildDeadlineBoard([
+      _deadline(
+        id: 1,
+        title: 'Required exam',
+        dueAt: DateTime(2026, 6, 5, 18),
+        tags: ['必修课', '考试'],
+      ),
+      _deadline(
+        id: 2,
+        title: 'Summer camp',
+        dueAt: DateTime(2026, 6, 6, 18),
+        tags: ['科学院', '夏令营'],
+      ),
+      _deadline(
+        id: 3,
+        title: 'Standalone exam',
+        dueAt: DateTime(2026, 6, 7, 18),
+        tags: ['考试'],
+      ),
+    ], now: now);
+
+    expect(deadlineTagOptions([...board.inProgress.scheduled]), [
+      '考试',
+      '夏令营',
+      '必修课',
+      '科学院',
+    ]);
+
+    final filtered = filterDeadlineBoardColumnByTags(board.inProgress, {
+      '必修课',
+      '考试',
+    });
+
+    expect(filtered.scheduled.map((deadline) => deadline.title), [
+      'Required exam',
+    ]);
+  });
 }
 
 Deadline _deadline({
@@ -54,6 +94,7 @@ Deadline _deadline({
   required String title,
   required DateTime? dueAt,
   bool isCompleted = false,
+  List<String> tags = const [],
 }) {
   final createdAt = DateTime(2026, 6, 1, 9, id);
   return Deadline(
@@ -65,5 +106,6 @@ Deadline _deadline({
     isCompleted: isCompleted,
     createdAt: createdAt,
     updatedAt: createdAt,
+    tags: tags,
   );
 }

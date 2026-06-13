@@ -8,8 +8,11 @@ class InMemoryDeadlineRepository implements DeadlineRepository {
     : _now = now ?? DateTime.now;
 
   final List<Deadline> _deadlines = [];
+  final List<String> _quickTags = [];
   final StreamController<List<Deadline>> _changes =
       StreamController<List<Deadline>>.broadcast();
+  final StreamController<List<String>> _quickTagChanges =
+      StreamController<List<String>>.broadcast();
   final DateTime Function() _now;
 
   int _nextId = 1;
@@ -37,6 +40,7 @@ class InMemoryDeadlineRepository implements DeadlineRepository {
       isCompleted: false,
       createdAt: now,
       updatedAt: now,
+      tags: normalizeDeadlineTags(draft.tags),
     );
     _deadlines.add(deadline);
     await _emit();
@@ -53,6 +57,7 @@ class InMemoryDeadlineRepository implements DeadlineRepository {
       notes: draft.notes.trim(),
       priority: draft.priority,
       updatedAt: _now(),
+      tags: normalizeDeadlineTags(draft.tags),
     );
     await _emit();
   }
@@ -75,8 +80,38 @@ class InMemoryDeadlineRepository implements DeadlineRepository {
   }
 
   @override
+  Stream<List<String>> watchQuickTags() async* {
+    yield await listQuickTags();
+    yield* _quickTagChanges.stream;
+  }
+
+  @override
+  Future<List<String>> listQuickTags() async {
+    return List.unmodifiable(_quickTags);
+  }
+
+  @override
+  Future<void> addQuickTag(String tag) async {
+    final cleaned = _cleanTag(tag);
+    if (!_quickTags.contains(cleaned)) {
+      _quickTags.add(cleaned);
+      await _emitQuickTags();
+    }
+  }
+
+  @override
+  Future<void> deleteQuickTag(String tag) async {
+    final cleaned = _cleanTag(tag);
+    final wasRemoved = _quickTags.remove(cleaned);
+    if (wasRemoved) {
+      await _emitQuickTags();
+    }
+  }
+
+  @override
   Future<void> close() async {
     await _changes.close();
+    await _quickTagChanges.close();
   }
 
   int _findIndex(int id) {
@@ -93,10 +128,24 @@ class InMemoryDeadlineRepository implements DeadlineRepository {
     }
   }
 
+  Future<void> _emitQuickTags() async {
+    if (!_quickTagChanges.isClosed) {
+      _quickTagChanges.add(await listQuickTags());
+    }
+  }
+
   String _cleanTitle(String title) {
     final cleaned = title.trim();
     if (cleaned.isEmpty) {
       throw ArgumentError.value(title, 'title', 'Title cannot be empty.');
+    }
+    return cleaned;
+  }
+
+  String _cleanTag(String tag) {
+    final cleaned = tag.trim();
+    if (cleaned.isEmpty) {
+      throw ArgumentError.value(tag, 'tag', 'Tag cannot be empty.');
     }
     return cleaned;
   }
